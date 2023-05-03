@@ -46,7 +46,7 @@ impl Socket {
             }
         };
 
-        return (packet_sender, packet_receiver);
+        (packet_sender, packet_receiver)
     }
 }
 

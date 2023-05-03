@@ -184,15 +184,11 @@ Access-Control-Allow-Origin: *
 
 struct RequestBuffer<'a, R: AsyncBufRead + Unpin> {
     buffer: &'a mut Lines<R>,
-    add_newline: bool,
 }
 
 impl<'a, R: AsyncBufRead + Unpin> RequestBuffer<'a, R> {
     fn new(buf: &'a mut Lines<R>) -> Self {
-        RequestBuffer {
-            add_newline: false,
-            buffer: buf,
-        }
+        RequestBuffer { buffer: buf }
     }
 }
 
@@ -203,26 +199,12 @@ const NEWLINE_STR: &str = "\n";
 impl<'a, R: AsyncBufRead + Unpin> Stream for RequestBuffer<'a, R> {
     type Item = Result<String, ReqError>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.add_newline {
-            self.add_newline = false;
-            Poll::Ready(Some(Ok(String::from(NEWLINE_STR))))
-        } else {
-            unsafe {
-                let mut_ref = Pin::new_unchecked(&mut self.buffer);
-                match Stream::poll_next(mut_ref, cx) {
-                    Poll::Ready(Some(item)) => {
-                        self.add_newline = true;
-                        Poll::Ready(Some(item))
-                    }
-                    Poll::Ready(None) => Poll::Ready(None),
-                    Poll::Pending => {
-                        // TODO: This could be catastrophic.. I don't understand futures very
-                        // well!
-                        Poll::Ready(None)
-                    }
-                }
-            }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut_ref = unsafe { self.map_unchecked_mut(|s| &mut s.buffer) };
+        match Stream::poll_next(mut_ref, cx) {
+            Poll::Ready(Some(item)) => Poll::Ready(Some(item.map(|item| item + NEWLINE_STR))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
         }
     }
 }

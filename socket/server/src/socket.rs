@@ -84,7 +84,7 @@ impl Socket {
             None => Box::new(PacketReceiverImpl::new(from_client_receiver)),
         };
 
-        return (packet_sender, packet_receiver);
+        (packet_sender, packet_receiver)
     }
 }
 
